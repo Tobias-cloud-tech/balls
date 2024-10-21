@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Physics Simulation Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Hide scrollbars */
+            background-color: #f0f0f0;
+        }
+        canvas {
+            display: block;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+// Get the canvas and context
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Set canvas to full window size
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+// Constants
+const GRAVITY = 980; // pixels per second squared
+const FRICTION = 0.8; // Wall collision damping
+const BALL_RESTITUTION = 0.8; // Ball collision elasticity (adjust as needed)
+const VELOCITY_SCALE = 1; // Adjust to control throw strength (1 for natural speed)
+const MAX_HISTORY_TIME = 100; // milliseconds
+const MAX_VELOCITY = 2000; // Maximum velocity to prevent excessive speed
+
+// Utility function to calculate distance between two points
+function distance(x1, y1, x2, y2) {
+    return Math.hypot(x2 - x1, y2 - y1);
+}
+
+// Ball class
+class Ball {
+    constructor(x, y, radius, color) {
+        this.x = x; // Current x position
+        this.y = y; // Current y position
+        this.vx = 0; // Velocity in x
+        this.vy = 0; // Velocity in y
+        this.radius = radius;
+        this.color = color;
+        this.mass = radius; // Mass proportional to radius
+        this.isDragging = false;
+        this.dragOffsetX = 0;
+        this.dragOffsetY = 0;
+        this.velocityHistory = []; // To store recent velocities
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    update(deltaTime) {
+        if (!this.isDragging) {
+            // Apply gravity
+            this.vy += GRAVITY * deltaTime;
+
+            // Update position
+            this.x += this.vx * deltaTime;
+            this.y += this.vy * deltaTime;
+
+            // Collision with walls
+            this.handleWallCollisions();
+
+            // Cap the velocity to prevent excessive speed
+            this.vx = Math.max(Math.min(this.vx, MAX_VELOCITY), -MAX_VELOCITY);
+            this.vy = Math.max(Math.min(this.vy, MAX_VELOCITY), -MAX_VELOCITY);
+        }
+    }
+
+    handleWallCollisions() {
+        // Left wall
+        if (this.x - this.radius < 0) {
+            this.x = this.radius;
+            this.vx = -this.vx * FRICTION;
+        }
+        // Right wall
+        if (this.x + this.radius > canvas.width) {
+            this.x = canvas.width - this.radius;
+            this.vx = -this.vx * FRICTION;
+        }
+        // Top wall
+        if (this.y - this.radius < 0) {
+            this.y = this.radius;
+            this.vy = -this.vy * FRICTION;
+        }
+        // Bottom wall
+        if (this.y + this.radius > canvas.height) {
+            this.y = canvas.height - this.radius;
+            this.vy = -this.vy * FRICTION;
+        }
+    }
+
+    isPointInside(px, py) {
+        return distance(this.x, this.y, px, py) <= this.radius;
+    }
+}
+
+// Initialize two balls
+const ball1 = new Ball(200, 200, 30, '#FF5733'); // Orange ball
+const ball2 = new Ball(400, 300, 30, '#3375FF'); // Blue ball
+const balls = [ball1, ball2];
+
+// Variables for dragging
+let selectedBall = null;
+let isMouseDown = false;
+
+// Event listeners for mouse interactions
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Check if any ball is clicked (iterate in reverse to select topmost ball if overlapping)
+    for (let i = balls.length - 1; i >= 0; i--) {
+        let ball = balls[i];
+        if (ball.isPointInside(mouseX, mouseY)) {
+            selectedBall = ball;
+            ball.isDragging = true;
+            ball.dragOffsetX = mouseX - ball.x;
+            ball.dragOffsetY = mouseY - ball.y;
+            ball.vx = 0;
+            ball.vy = 0;
+            isMouseDown = true;
+            // Clear previous velocity history
+            ball.velocityHistory = [];
+            break;
+        }
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (selectedBall && selectedBall.isDragging) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Update ball position based on mouse, keeping the offset
+        selectedBall.x = mouseX - selectedBall.dragOffsetX;
+        selectedBall.y = mouseY - selectedBall.dragOffsetY;
+
+        // Record recent mouse positions and times
+        const currentTime = performance.now();
+        selectedBall.velocityHistory.push({
+            x: mouseX,
+            y: mouseY,
+            time: currentTime
+        });
+
+        // Remove old history entries
+        while (selectedBall.velocityHistory.length > 0 &&
+               (currentTime - selectedBall.velocityHistory[0].time) > MAX_HISTORY_TIME) {
+            selectedBall.velocityHistory.shift();
+        }
+    }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (selectedBall && selectedBall.isDragging) {
+        const dragEndTime = performance.now();
+
+        // Calculate velocity based on the last few mouse movements within MAX_HISTORY_TIME
+        const history = selectedBall.velocityHistory;
+        if (history.length >= 2) {
+            const first = history[0];
+            const last = history[history.length - 1];
+            const timeDiff = (last.time - first.time) / 1000; // in seconds
+
+            if (timeDiff > 0) {
+                const deltaX = last.x - first.x;
+                const deltaY = last.y - first.y;
+
+                // Calculate velocity
+                let calculatedVx = (deltaX / timeDiff) * VELOCITY_SCALE;
+                let calculatedVy = (deltaY / timeDiff) * VELOCITY_SCALE;
+
+                // Cap the velocity to prevent excessive speed
+                calculatedVx = Math.max(Math.min(calculatedVx, MAX_VELOCITY), -MAX_VELOCITY);
+                calculatedVy = Math.max(Math.min(calculatedVy, MAX_VELOCITY), -MAX_VELOCITY);
+
+                selectedBall.vx = calculatedVx;
+                selectedBall.vy = calculatedVy;
+            }
+        }
+
+        selectedBall.isDragging = false;
+        selectedBall = null;
+        isMouseDown = false;
+    }
+});
+
+// Prevent text selection while dragging
+canvas.addEventListener('dragstart', (e) => e.preventDefault());
+
+// Collision detection and response between two balls
+function handleCollision(ballA, ballB) {
+    // Don't handle collision if one of the balls is being dragged
+    if (ballA.isDragging || ballB.isDragging) {
+        return;
+    }
+
+    const dx = ballB.x - ballA.x;
+    const dy = ballB.y - ballA.y;
+    const dist = Math.hypot(dx, dy);
+    const minDist = ballA.radius + ballB.radius;
+
+    if (dist < minDist) {
+        // Calculate normal and tangent vectors
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const tx = -ny;
+        const ty = nx;
+
+        // Dot product of velocity vectors with normal and tangent vectors
+        const dpTan1 = ballA.vx * tx + ballA.vy * ty;
+        const dpTan2 = ballB.vx * tx + ballB.vy * ty;
+
+        const dpNorm1 = ballA.vx * nx + ballA.vy * ny;
+        const dpNorm2 = ballB.vx * nx + ballB.vy * ny;
+
+        // Conservation of momentum in 1D
+        const m1 = ballA.mass;
+        const m2 = ballB.mass;
+
+        const momentum1 = (dpNorm1 * (m1 - m2) + 2 * m2 * dpNorm2) / (m1 + m2);
+        const momentum2 = (dpNorm2 * (m2 - m1) + 2 * m1 * dpNorm1) / (m1 + m2);
+
+        // Update velocities with restitution
+        ballA.vx = tx * dpTan1 + nx * momentum1 * BALL_RESTITUTION;
+        ballA.vy = ty * dpTan1 + ny * momentum1 * BALL_RESTITUTION;
+        ballB.vx = tx * dpTan2 + nx * momentum2 * BALL_RESTITUTION;
+        ballB.vy = ty * dpTan2 + ny * momentum2 * BALL_RESTITUTION;
+
+        // Position correction to prevent balls from sticking
+        const overlap = minDist - dist;
+        const totalMass = ballA.mass + ballB.mass;
+        const correctionX = (overlap * nx) / totalMass;
+        const correctionY = (overlap * ny) / totalMass;
+
+        ballA.x -= correctionX * ballB.mass;
+        ballA.y -= correctionY * ballB.mass;
+        ballB.x += correctionX * ballA.mass;
+        ballB.y += correctionY * ballA.mass;
+    }
+}
+
+// Main update loop
+let lastTime = performance.now();
+
+function update() {
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+    lastTime = currentTime;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update and draw each ball
+    for (let ball of balls) {
+        ball.update(deltaTime);
+        ball.draw(ctx);
+    }
+
+    // Handle collision between all pairs of balls
+    for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+            handleCollision(balls[i], balls[j]);
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+// Start the loop
+update();
+</script>
+</body>
+</html>
