@@ -2,297 +2,755 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Interactive Physics Simulation Game</title>
+    <title>Game</title>
     <style>
         body {
             margin: 0;
             overflow: hidden; /* Hide scrollbars */
             background-color: #f0f0f0;
+            position: relative;
+            font-family: Arial, sans-serif;
         }
         canvas {
             display: block;
             background-color: #ffffff;
         }
+
+        /* Styles for the spawn button */
+        #spawnButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px 20px;
+            background-color: #3375FF;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+        #spawnButton:hover {
+            background-color: #2868D4;
+        }
+
+        /* Styles for the movable windows */
+        .window {
+            position: absolute;
+            width: 300px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            display: none; /* Hidden by default */
+            z-index: 1000;
+        }
+        .window-header {
+            padding: 10px;
+            background-color: #3375FF;
+            color: #ffffff;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .window-header .title {
+            font-weight: bold;
+        }
+        .window-header .close-btn {
+            background-color: #ff4d4d;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            text-align: center;
+            line-height: 18px;
+            font-weight: bold;
+        }
+        .window-content {
+            padding: 15px;
+        }
+        .window-content label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .window-content input[type="range"],
+        .window-content input[type="number"],
+        .window-content input[type="color"] {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .window-content .color-sliders {
+            display: flex;
+            justify-content: space-between;
+        }
+        .window-content .color-sliders label {
+            flex: 1;
+            margin-right: 5px;
+        }
+        .window-content .color-sliders label:last-child {
+            margin-right: 0;
+        }
+        .window-content .color-sliders input[type="range"] {
+            width: 100%;
+        }
+        .window-content button {
+            padding: 10px;
+            width: 100%;
+            background-color: #3375FF;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .window-content button:hover {
+            background-color: #2868D4;
+        }
     </style>
 </head>
 <body>
-<canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
-<script>
-// Get the canvas and context
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+    <!-- Spawn Button -->
+    <button id="spawnButton">Spawn Ball</button>
 
-// Set canvas to full window size
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+    <!-- Edit Ball Window -->
+    <div id="editWindow" class="window">
+        <div class="window-header">
+            <span class="title">Edit Ball</span>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="window-content">
+            <label for="editMass">Mass:</label>
+            <input type="number" id="editMass" min="10" max="500" step="1">
 
-// Handle window resize
-window.addEventListener('resize', () => {
+            <label for="editSize">Size (Radius):</label>
+            <input type="number" id="editSize" min="10" max="100" step="1">
+
+            <label>Color:</label>
+            <div class="color-sliders">
+                <label>
+                    R:
+                    <input type="range" id="editColorR" min="0" max="255" value="255">
+                </label>
+                <label>
+                    G:
+                    <input type="range" id="editColorG" min="0" max="255" value="0">
+                </label>
+                <label>
+                    B:
+                    <input type="range" id="editColorB" min="0" max="255" value="0">
+                </label>
+            </div>
+
+            <button id="deleteBall">Delete Ball</button>
+        </div>
+    </div>
+
+    <!-- Spawn Ball Window -->
+    <div id="spawnWindow" class="window">
+        <div class="window-header">
+            <span class="title">Spawn New Ball</span>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="window-content">
+            <label for="spawnMass">Mass:</label>
+            <input type="number" id="spawnMass" min="10" max="500" step="1" value="50">
+
+            <label for="spawnSize">Size (Radius):</label>
+            <input type="number" id="spawnSize" min="10" max="100" step="1" value="30">
+
+            <label>Color:</label>
+            <div class="color-sliders">
+                <label>
+                    R:
+                    <input type="range" id="spawnColorR" min="0" max="255" value="255">
+                </label>
+                <label>
+                    G:
+                    <input type="range" id="spawnColorG" min="0" max="255" value="0">
+                </label>
+                <label>
+                    B:
+                    <input type="range" id="spawnColorB" min="0" max="255" value="0">
+                </label>
+            </div>
+
+            <button id="spawnNewBall">Spawn</button>
+        </div>
+    </div>
+
+    <script>
+    // Get the canvas and context
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas to full window size
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-});
 
-// Constants
-const GRAVITY = 980; // pixels per second squared
-const FRICTION = 0.8; // Wall collision damping
-const BALL_RESTITUTION = 0.8; // Ball collision elasticity (adjust as needed)
-const VELOCITY_SCALE = 1; // Adjust to control throw strength (1 for natural speed)
-const MAX_HISTORY_TIME = 100; // milliseconds
-const MAX_VELOCITY = 2000; // Maximum velocity to prevent excessive speed
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
 
-// Utility function to calculate distance between two points
-function distance(x1, y1, x2, y2) {
-    return Math.hypot(x2 - x1, y2 - y1);
-}
+    // Constants
+    const GRAVITY = 980; // pixels per second squared
+    const FRICTION = 0.8; // Wall collision damping
+    const BALL_RESTITUTION = 0.8; // Ball collision elasticity
+    const VELOCITY_SCALE = 1; // Adjust to control throw strength
+    const MAX_HISTORY_TIME = 100; // milliseconds
+    const MAX_VELOCITY = 2000; // Maximum velocity to prevent excessive speed
 
-// Ball class
-class Ball {
-    constructor(x, y, radius, color) {
-        this.x = x; // Current x position
-        this.y = y; // Current y position
-        this.vx = 0; // Velocity in x
-        this.vy = 0; // Velocity in y
-        this.radius = radius;
-        this.color = color;
-        this.mass = radius; // Mass proportional to radius
-        this.isDragging = false;
-        this.dragOffsetX = 0;
-        this.dragOffsetY = 0;
-        this.velocityHistory = []; // To store recent velocities
+    // Utility function to calculate distance between two points
+    function distance(x1, y1, x2, y2) {
+        return Math.hypot(x2 - x1, y2 - y1);
     }
 
-    draw(ctx) {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.closePath();
-    }
+    // Ball class
+    class Ball {
+        constructor(x, y, radius, color) {
+            this.x = x; // Current x position
+            this.y = y; // Current y position
+            this.vx = 0; // Velocity in x
+            this.vy = 0; // Velocity in y
+            this.radius = radius;
+            this.color = color;
+            this.mass = Math.PI * radius * radius; // Mass proportional to area for realism
+            this.isDragging = false;
+            this.dragOffsetX = 0;
+            this.dragOffsetY = 0;
+            this.velocityHistory = []; // To store recent velocities
+        }
 
-    update(deltaTime) {
-        if (!this.isDragging) {
-            // Apply gravity
-            this.vy += GRAVITY * deltaTime;
+        draw(ctx) {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.closePath();
+        }
 
-            // Update position
-            this.x += this.vx * deltaTime;
-            this.y += this.vy * deltaTime;
+        update(deltaTime) {
+            if (!this.isDragging) {
+                // Apply gravity
+                this.vy += GRAVITY * deltaTime;
 
-            // Collision with walls
-            this.handleWallCollisions();
+                // Update position
+                this.x += this.vx * deltaTime;
+                this.y += this.vy * deltaTime;
 
-            // Cap the velocity to prevent excessive speed
-            this.vx = Math.max(Math.min(this.vx, MAX_VELOCITY), -MAX_VELOCITY);
-            this.vy = Math.max(Math.min(this.vy, MAX_VELOCITY), -MAX_VELOCITY);
+                // Collision with walls
+                this.handleWallCollisions();
+
+                // Cap the velocity to prevent excessive speed
+                this.vx = Math.max(Math.min(this.vx, MAX_VELOCITY), -MAX_VELOCITY);
+                this.vy = Math.max(Math.min(this.vy, MAX_VELOCITY), -MAX_VELOCITY);
+            }
+        }
+
+        handleWallCollisions() {
+            // Left wall
+            if (this.x - this.radius < 0) {
+                this.x = this.radius;
+                this.vx = -this.vx * FRICTION;
+            }
+            // Right wall
+            if (this.x + this.radius > canvas.width) {
+                this.x = canvas.width - this.radius;
+                this.vx = -this.vx * FRICTION;
+            }
+            // Top wall
+            if (this.y - this.radius < 0) {
+                this.y = this.radius;
+                this.vy = -this.vy * FRICTION;
+            }
+            // Bottom wall
+            if (this.y + this.radius > canvas.height) {
+                this.y = canvas.height - this.radius;
+                this.vy = -this.vy * FRICTION;
+            }
+        }
+
+        isPointInside(px, py) {
+            return distance(this.x, this.y, px, py) <= this.radius;
         }
     }
 
-    handleWallCollisions() {
-        // Left wall
-        if (this.x - this.radius < 0) {
-            this.x = this.radius;
-            this.vx = -this.vx * FRICTION;
-        }
-        // Right wall
-        if (this.x + this.radius > canvas.width) {
-            this.x = canvas.width - this.radius;
-            this.vx = -this.vx * FRICTION;
-        }
-        // Top wall
-        if (this.y - this.radius < 0) {
-            this.y = this.radius;
-            this.vy = -this.vy * FRICTION;
-        }
-        // Bottom wall
-        if (this.y + this.radius > canvas.height) {
-            this.y = canvas.height - this.radius;
-            this.vy = -this.vy * FRICTION;
-        }
+    // Initialize two balls
+    const balls = [];
+    balls.push(new Ball(200, 200, 30, '#FF5733')); // Orange ball
+    balls.push(new Ball(400, 300, 30, '#3375FF')); // Blue ball
+
+    // Variables for dragging
+    let selectedBall = null;
+    let isMouseDown = false;
+
+    // Get window elements
+    const editWindow = document.getElementById('editWindow');
+    const spawnWindow = document.getElementById('spawnWindow');
+
+    // Get close buttons
+    const editCloseBtn = editWindow.querySelector('.close-btn');
+    const spawnCloseBtn = spawnWindow.querySelector('.close-btn');
+
+    // Get spawn button
+    const spawnButton = document.getElementById('spawnButton');
+
+    // Get edit window inputs
+    const editMassInput = document.getElementById('editMass');
+    const editSizeInput = document.getElementById('editSize');
+    const editColorR = document.getElementById('editColorR');
+    const editColorG = document.getElementById('editColorG');
+    const editColorB = document.getElementById('editColorB');
+    const deleteBallButton = document.getElementById('deleteBall');
+
+    // Get spawn window inputs
+    const spawnMassInput = document.getElementById('spawnMass');
+    const spawnSizeInput = document.getElementById('spawnSize');
+    const spawnColorR = document.getElementById('spawnColorR');
+    const spawnColorG = document.getElementById('spawnColorG');
+    const spawnColorB = document.getElementById('spawnColorB');
+    const spawnNewBallButton = document.getElementById('spawnNewBall');
+
+    // Function to convert RGB sliders to hex color
+    function rgbToHex(r, g, b) {
+        return "#" + [r, g, b].map(x => {
+            const hex = x.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
     }
 
-    isPointInside(px, py) {
-        return distance(this.x, this.y, px, py) <= this.radius;
-    }
-}
+    // Function to open the edit window with selected ball's properties
+    function openEditWindow(ball, x, y) {
+        // Set initial values
+        editMassInput.value = Math.round(ball.mass);
+        editSizeInput.value = Math.round(ball.radius);
+        // Extract RGB from current color
+        const rgb = hexToRgb(ball.color);
+        editColorR.value = rgb.r;
+        editColorG.value = rgb.g;
+        editColorB.value = rgb.b;
 
-// Initialize two balls
-const ball1 = new Ball(200, 200, 30, '#FF5733'); // Orange ball
-const ball2 = new Ball(400, 300, 30, '#3375FF'); // Blue ball
-const balls = [ball1, ball2];
+        // Position the window near the cursor, but within viewport
+        const windowWidth = 300;
+        const windowHeight = editWindow.offsetHeight || 250; // Approximate height
+        let posX = x + 10;
+        let posY = y + 10;
 
-// Variables for dragging
-let selectedBall = null;
-let isMouseDown = false;
-
-// Event listeners for mouse interactions
-canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Check if any ball is clicked (iterate in reverse to select topmost ball if overlapping)
-    for (let i = balls.length - 1; i >= 0; i--) {
-        let ball = balls[i];
-        if (ball.isPointInside(mouseX, mouseY)) {
-            selectedBall = ball;
-            ball.isDragging = true;
-            ball.dragOffsetX = mouseX - ball.x;
-            ball.dragOffsetY = mouseY - ball.y;
-            ball.vx = 0;
-            ball.vy = 0;
-            isMouseDown = true;
-            // Clear previous velocity history
-            ball.velocityHistory = [];
-            break;
+        if (posX + windowWidth > window.innerWidth) {
+            posX = window.innerWidth - windowWidth - 10;
         }
-    }
-});
+        if (posY + windowHeight > window.innerHeight) {
+            posY = window.innerHeight - windowHeight - 10;
+        }
 
-canvas.addEventListener('mousemove', (e) => {
-    if (selectedBall && selectedBall.isDragging) {
+        editWindow.style.left = `${posX}px`;
+        editWindow.style.top = `${posY}px`;
+        editWindow.style.display = 'block';
+
+        // Attach the ball to the window for reference
+        editWindow.targetBall = ball;
+    }
+
+    // Function to close the edit window
+    function closeEditWindow() {
+        editWindow.style.display = 'none';
+        editWindow.targetBall = null;
+    }
+
+    // Function to open the spawn window
+    function openSpawnWindow(x, y) {
+        // Reset spawn inputs to default values
+        spawnMassInput.value = 50;
+        spawnSizeInput.value = 30;
+        spawnColorR.value = 255;
+        spawnColorG.value = 0;
+        spawnColorB.value = 0;
+
+        // Position the window near the spawn button, but within viewport
+        const windowWidth = 300;
+        const windowHeight = spawnWindow.offsetHeight || 250; // Approximate height
+        let posX = 20; // Fixed position near spawn button
+        let posY = 50; // Fixed position
+
+        if (posX + windowWidth > window.innerWidth) {
+            posX = window.innerWidth - windowWidth - 10;
+        }
+        if (posY + windowHeight > window.innerHeight) {
+            posY = window.innerHeight - windowHeight - 10;
+        }
+
+        spawnWindow.style.left = `${posX}px`;
+        spawnWindow.style.top = `${posY}px`;
+        spawnWindow.style.display = 'block';
+    }
+
+    // Function to close the spawn window
+    function closeSpawnWindow() {
+        spawnWindow.style.display = 'none';
+    }
+
+    // Function to convert hex color to RGB
+    function hexToRgb(hex) {
+        // Remove hash if present
+        hex = hex.replace('#', '');
+        let bigint = parseInt(hex, 16);
+        let r = (bigint >> 16) & 255;
+        let g = (bigint >> 8) & 255;
+        let b = bigint & 255;
+        return { r, g, b };
+    }
+
+    // Handle mousedown for dragging windows
+    function makeDraggable(windowElement) {
+        const header = windowElement.querySelector('.window-header');
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        header.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            const rect = windowElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            windowElement.style.zIndex = parseInt(windowElement.style.zIndex) + 1;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                let newX = e.clientX - offsetX;
+                let newY = e.clientY - offsetY;
+
+                // Prevent the window from being dragged out of viewport
+                newX = Math.max(0, Math.min(newX, window.innerWidth - windowElement.offsetWidth));
+                newY = Math.max(0, Math.min(newY, window.innerHeight - windowElement.offsetHeight));
+
+                windowElement.style.left = `${newX}px`;
+                windowElement.style.top = `${newY}px`;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    }
+
+    // Make both windows draggable
+    makeDraggable(editWindow);
+    makeDraggable(spawnWindow);
+
+    // Event listener for closing edit window
+    editCloseBtn.addEventListener('click', closeEditWindow);
+
+    // Event listener for closing spawn window
+    spawnCloseBtn.addEventListener('click', closeSpawnWindow);
+
+    // Event listeners for mouse interactions (dragging balls)
+    canvas.addEventListener('mousedown', (e) => {
+        // Only handle left-click for dragging
+        if (e.button !== 0) return;
+
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // Update ball position based on mouse, keeping the offset
-        selectedBall.x = mouseX - selectedBall.dragOffsetX;
-        selectedBall.y = mouseY - selectedBall.dragOffsetY;
+        // Check if any ball is clicked (iterate in reverse to select topmost ball if overlapping)
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let ball = balls[i];
+            if (ball.isPointInside(mouseX, mouseY)) {
+                selectedBall = ball;
+                ball.isDragging = true;
+                ball.dragOffsetX = mouseX - ball.x;
+                ball.dragOffsetY = mouseY - ball.y;
+                ball.vx = 0;
+                ball.vy = 0;
+                isMouseDown = true;
+                // Clear previous velocity history
+                ball.velocityHistory = [];
+                break;
+            }
+        }
+    });
 
-        // Record recent mouse positions and times
-        const currentTime = performance.now();
-        selectedBall.velocityHistory.push({
-            x: mouseX,
-            y: mouseY,
-            time: currentTime
-        });
+    canvas.addEventListener('mousemove', (e) => {
+        if (selectedBall && selectedBall.isDragging) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
 
-        // Remove old history entries
-        while (selectedBall.velocityHistory.length > 0 &&
-               (currentTime - selectedBall.velocityHistory[0].time) > MAX_HISTORY_TIME) {
-            selectedBall.velocityHistory.shift();
+            // Update ball position based on mouse, keeping the offset
+            selectedBall.x = mouseX - selectedBall.dragOffsetX;
+            selectedBall.y = mouseY - selectedBall.dragOffsetY;
+
+            // Record recent mouse positions and times
+            const currentTime = performance.now();
+            selectedBall.velocityHistory.push({
+                x: mouseX,
+                y: mouseY,
+                time: currentTime
+            });
+
+            // Remove old history entries
+            while (selectedBall.velocityHistory.length > 0 &&
+                   (currentTime - selectedBall.velocityHistory[0].time) > MAX_HISTORY_TIME) {
+                selectedBall.velocityHistory.shift();
+            }
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (selectedBall && selectedBall.isDragging) {
+            const dragEndTime = performance.now();
+
+            // Calculate velocity based on the last few mouse movements within MAX_HISTORY_TIME
+            const history = selectedBall.velocityHistory;
+            if (history.length >= 2) {
+                const first = history[0];
+                const last = history[history.length - 1];
+                const timeDiff = (last.time - first.time) / 1000; // in seconds
+
+                if (timeDiff > 0) {
+                    const deltaX = last.x - first.x;
+                    const deltaY = last.y - first.y;
+
+                    // Calculate velocity
+                    let calculatedVx = (deltaX / timeDiff) * VELOCITY_SCALE;
+                    let calculatedVy = (deltaY / timeDiff) * VELOCITY_SCALE;
+
+                    // Cap the velocity to prevent excessive speed
+                    calculatedVx = Math.max(Math.min(calculatedVx, MAX_VELOCITY), -MAX_VELOCITY);
+                    calculatedVy = Math.max(Math.min(calculatedVy, MAX_VELOCITY), -MAX_VELOCITY);
+
+                    selectedBall.vx = calculatedVx;
+                    selectedBall.vy = calculatedVy;
+                }
+            }
+
+            selectedBall.isDragging = false;
+            selectedBall = null;
+            isMouseDown = false;
+        }
+    });
+
+    // Prevent text selection while dragging
+    canvas.addEventListener('dragstart', (e) => e.preventDefault());
+
+    // Handle right-click for context menu
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault(); // Prevent the default context menu
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Check if any ball is right-clicked
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let ball = balls[i];
+            if (ball.isPointInside(mouseX, mouseY)) {
+                // Open the edit window near the cursor
+                openEditWindow(ball, e.clientX, e.clientY);
+                break;
+            }
+        }
+    });
+
+    // Handle input changes in the edit window
+    editMassInput.addEventListener('input', () => {
+        const ball = editWindow.targetBall;
+        if (ball) {
+            const newMass = parseFloat(editMassInput.value);
+            if (!isNaN(newMass) && newMass > 0) {
+                ball.mass = newMass;
+                // Optionally, adjust velocity based on mass
+            }
+        }
+    });
+
+    editSizeInput.addEventListener('input', () => {
+        const ball = editWindow.targetBall;
+        if (ball) {
+            const newSize = parseFloat(editSizeInput.value);
+            if (!isNaN(newSize) && newSize >= 10 && newSize <= 100) {
+                // Update mass based on new size
+                ball.radius = newSize;
+                ball.mass = Math.PI * ball.radius * ball.radius;
+            }
+        }
+    });
+
+    // Update color as sliders change
+    function updateEditColor() {
+        const ball = editWindow.targetBall;
+        if (ball) {
+            const r = parseInt(editColorR.value);
+            const g = parseInt(editColorG.value);
+            const b = parseInt(editColorB.value);
+            ball.color = rgbToHex(r, g, b);
         }
     }
-});
 
-canvas.addEventListener('mouseup', (e) => {
-    if (selectedBall && selectedBall.isDragging) {
-        const dragEndTime = performance.now();
+    editColorR.addEventListener('input', updateEditColor);
+    editColorG.addEventListener('input', updateEditColor);
+    editColorB.addEventListener('input', updateEditColor);
 
-        // Calculate velocity based on the last few mouse movements within MAX_HISTORY_TIME
-        const history = selectedBall.velocityHistory;
-        if (history.length >= 2) {
-            const first = history[0];
-            const last = history[history.length - 1];
-            const timeDiff = (last.time - first.time) / 1000; // in seconds
+    // Handle delete ball
+    deleteBallButton.addEventListener('click', () => {
+        const ball = editWindow.targetBall;
+        if (ball) {
+            const index = balls.indexOf(ball);
+            if (index !== -1) {
+                balls.splice(index, 1);
+            }
+            closeEditWindow();
+        }
+    });
 
-            if (timeDiff > 0) {
-                const deltaX = last.x - first.x;
-                const deltaY = last.y - first.y;
+    // Handle spawn button click
+    spawnButton.addEventListener('click', (e) => {
+        openSpawnWindow(e.clientX, e.clientY);
+    });
 
-                // Calculate velocity
-                let calculatedVx = (deltaX / timeDiff) * VELOCITY_SCALE;
-                let calculatedVy = (deltaY / timeDiff) * VELOCITY_SCALE;
+    // Handle input changes in the spawn window
+    function updateSpawnColor() {
+        // This function can be used to preview color if needed
+    }
 
-                // Cap the velocity to prevent excessive speed
-                calculatedVx = Math.max(Math.min(calculatedVx, MAX_VELOCITY), -MAX_VELOCITY);
-                calculatedVy = Math.max(Math.min(calculatedVy, MAX_VELOCITY), -MAX_VELOCITY);
+    spawnColorR.addEventListener('input', updateSpawnColor);
+    spawnColorG.addEventListener('input', updateSpawnColor);
+    spawnColorB.addEventListener('input', updateSpawnColor);
 
-                selectedBall.vx = calculatedVx;
-                selectedBall.vy = calculatedVy;
+    // Handle spawning a new ball
+    spawnNewBallButton.addEventListener('click', () => {
+        const mass = parseFloat(spawnMassInput.value);
+        const size = parseFloat(spawnSizeInput.value);
+        const r = parseInt(spawnColorR.value);
+        const g = parseInt(spawnColorG.value);
+        const b = parseInt(spawnColorB.value);
+
+        if (isNaN(mass) || mass <= 0 || isNaN(size) || size < 10 || size > 100) {
+            alert('Please enter valid mass and size values.');
+            return;
+        }
+
+        const color = rgbToHex(r, g, b);
+
+        // Spawn the new ball at a random position avoiding edges
+        const radius = size;
+        const x = radius + Math.random() * (canvas.width - 2 * radius);
+        const y = radius + Math.random() * (canvas.height - 2 * radius);
+        const newBall = new Ball(x, y, radius, color);
+        newBall.mass = mass; // Set mass as specified
+
+        balls.push(newBall);
+
+        // Close the spawn window
+        closeSpawnWindow();
+    });
+
+    // Function to spawn a new ball with random properties
+    function spawnNewBallRandom() {
+        const radius = 20 + Math.random() * 20; // Radius between 20 and 40
+        const x = radius + Math.random() * (canvas.width - 2 * radius);
+        const y = radius + Math.random() * (canvas.height - 2 * radius);
+        const color = getRandomColor();
+        const newBall = new Ball(x, y, radius, color);
+        balls.push(newBall);
+    }
+
+    // Utility function to generate random color
+    function getRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
+    // Collision detection and response between two balls
+    function handleCollision(ballA, ballB) {
+        // Don't handle collision if one of the balls is being dragged
+        if (ballA.isDragging || ballB.isDragging) {
+            return;
+        }
+
+        const dx = ballB.x - ballA.x;
+        const dy = ballB.y - ballA.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = ballA.radius + ballB.radius;
+
+        if (dist < minDist) {
+            // Calculate normal and tangent vectors
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const tx = -ny;
+            const ty = nx;
+
+            // Dot product of velocity vectors with normal and tangent vectors
+            const dpTan1 = ballA.vx * tx + ballA.vy * ty;
+            const dpTan2 = ballB.vx * tx + ballB.vy * ty;
+
+            const dpNorm1 = ballA.vx * nx + ballA.vy * ny;
+            const dpNorm2 = ballB.vx * nx + ballB.vy * ny;
+
+            // Conservation of momentum in 1D
+            const m1 = ballA.mass;
+            const m2 = ballB.mass;
+
+            const momentum1 = (dpNorm1 * (m1 - m2) + 2 * m2 * dpNorm2) / (m1 + m2);
+            const momentum2 = (dpNorm2 * (m2 - m1) + 2 * m1 * dpNorm1) / (m1 + m2);
+
+            // Update velocities with restitution
+            ballA.vx = tx * dpTan1 + nx * momentum1 * BALL_RESTITUTION;
+            ballA.vy = ty * dpTan1 + ny * momentum1 * BALL_RESTITUTION;
+            ballB.vx = tx * dpTan2 + nx * momentum2 * BALL_RESTITUTION;
+            ballB.vy = ty * dpTan2 + ny * momentum2 * BALL_RESTITUTION;
+
+            // Position correction to prevent balls from sticking
+            const overlap = minDist - dist;
+            const totalMass = ballA.mass + ballB.mass;
+            const correctionX = (overlap * nx) / totalMass;
+            const correctionY = (overlap * ny) / totalMass;
+
+            ballA.x -= correctionX * ballB.mass;
+            ballA.y -= correctionY * ballB.mass;
+            ballB.x += correctionX * ballA.mass;
+            ballB.y += correctionY * ballA.mass;
+        }
+    }
+
+    // Main update loop
+    let lastTime = performance.now();
+
+    function update() {
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+        lastTime = currentTime;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Update and draw each ball
+        for (let ball of balls) {
+            ball.update(deltaTime);
+            ball.draw(ctx);
+        }
+
+        // Handle collision between all pairs of balls
+        for (let i = 0; i < balls.length; i++) {
+            for (let j = i + 1; j < balls.length; j++) {
+                handleCollision(balls[i], balls[j]);
             }
         }
 
-        selectedBall.isDragging = false;
-        selectedBall = null;
-        isMouseDown = false;
-    }
-});
-
-// Prevent text selection while dragging
-canvas.addEventListener('dragstart', (e) => e.preventDefault());
-
-// Collision detection and response between two balls
-function handleCollision(ballA, ballB) {
-    // Don't handle collision if one of the balls is being dragged
-    if (ballA.isDragging || ballB.isDragging) {
-        return;
+        requestAnimationFrame(update);
     }
 
-    const dx = ballB.x - ballA.x;
-    const dy = ballB.y - ballA.y;
-    const dist = Math.hypot(dx, dy);
-    const minDist = ballA.radius + ballB.radius;
-
-    if (dist < minDist) {
-        // Calculate normal and tangent vectors
-        const nx = dx / dist;
-        const ny = dy / dist;
-        const tx = -ny;
-        const ty = nx;
-
-        // Dot product of velocity vectors with normal and tangent vectors
-        const dpTan1 = ballA.vx * tx + ballA.vy * ty;
-        const dpTan2 = ballB.vx * tx + ballB.vy * ty;
-
-        const dpNorm1 = ballA.vx * nx + ballA.vy * ny;
-        const dpNorm2 = ballB.vx * nx + ballB.vy * ny;
-
-        // Conservation of momentum in 1D
-        const m1 = ballA.mass;
-        const m2 = ballB.mass;
-
-        const momentum1 = (dpNorm1 * (m1 - m2) + 2 * m2 * dpNorm2) / (m1 + m2);
-        const momentum2 = (dpNorm2 * (m2 - m1) + 2 * m1 * dpNorm1) / (m1 + m2);
-
-        // Update velocities with restitution
-        ballA.vx = tx * dpTan1 + nx * momentum1 * BALL_RESTITUTION;
-        ballA.vy = ty * dpTan1 + ny * momentum1 * BALL_RESTITUTION;
-        ballB.vx = tx * dpTan2 + nx * momentum2 * BALL_RESTITUTION;
-        ballB.vy = ty * dpTan2 + ny * momentum2 * BALL_RESTITUTION;
-
-        // Position correction to prevent balls from sticking
-        const overlap = minDist - dist;
-        const totalMass = ballA.mass + ballB.mass;
-        const correctionX = (overlap * nx) / totalMass;
-        const correctionY = (overlap * ny) / totalMass;
-
-        ballA.x -= correctionX * ballB.mass;
-        ballA.y -= correctionY * ballB.mass;
-        ballB.x += correctionX * ballA.mass;
-        ballB.y += correctionY * ballA.mass;
-    }
-}
-
-// Main update loop
-let lastTime = performance.now();
-
-function update() {
-    const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
-    lastTime = currentTime;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Update and draw each ball
-    for (let ball of balls) {
-        ball.update(deltaTime);
-        ball.draw(ctx);
-    }
-
-    // Handle collision between all pairs of balls
-    for (let i = 0; i < balls.length; i++) {
-        for (let j = i + 1; j < balls.length; j++) {
-            handleCollision(balls[i], balls[j]);
-        }
-    }
-
-    requestAnimationFrame(update);
-}
-
-// Start the loop
-update();
-</script>
+    // Start the loop
+    update();
+    </script>
 </body>
 </html>
