@@ -345,7 +345,7 @@
             }
         });
 
-        // Store the original and last color so we can revert to it after removing texture
+        // Store the original and last color so we can revert to it after removing or switching from texture
         ball.originalColor = color;
         ball.lastColorBeforeTexture = color;
         ball.originalTextureSource = null;
@@ -614,25 +614,38 @@
         }
     });
 
+    // Updated event listener for appearance mode (the key fix requested)
     appearanceModeEditRadios.forEach(r => r.addEventListener('change', () => {
         const ball = selectedBallBody;
         if (!ball) return;
 
         if (r.value === "color") {
+            // Switch to color mode
             colorSectionEdit.style.display = "block";
             textureSectionEdit.style.display = "none";
-            // Revert to the last stored color before texture
+
+            // Revert to the ball's own stored last color before texture
             if (ball.lastColorBeforeTexture) {
                 ball.render.fillStyle = ball.lastColorBeforeTexture;
             }
+
+            // Remove the texture if present
             if (ball.render.sprite && ball.render.sprite.texture) {
                 ball.render.sprite.texture = null;
                 ball.render.sprite.xScale = 1;
                 ball.render.sprite.yScale = 1;
             }
-            updateEditColorUI();
+
+            // Update the sliders to match the ball's restored color
+            const rgb = hexToRgb(ball.render.fillStyle || '#ffffff');
+            editColorR.value = rgb.r;
+            editColorG.value = rgb.g;
+            editColorB.value = rgb.b;
+
+            // Do NOT call updateEditColorUI() here, since we already synchronized the sliders with the ball color.
         } else {
-            // Before switching to texture mode, remember the current color
+            // Switch to texture mode
+            // Before switching to texture mode, remember the current color if there is one
             if (ball.render.fillStyle) {
                 ball.lastColorBeforeTexture = ball.render.fillStyle;
             }
@@ -728,7 +741,6 @@
         editColorR.value = rgb.r;
         editColorG.value = rgb.g;
         editColorB.value = rgb.b;
-        updateEditColorUI();
     });
 
     appearanceModeSpawnRadios.forEach(r => r.addEventListener('change', () => {
