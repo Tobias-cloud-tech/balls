@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>balls</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            position: relative;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+            background-color: #ffffff;
+        }
+
+        #spawnButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px 20px;
+            background-color: #3375FF;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+        #spawnButton:hover {
+            background-color: #2868D4;
+        }
+
+        .window {
+            position: absolute;
+            width: 300px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+        }
+        .window-header {
+            padding: 10px;
+            background-color: #3375FF;
+            color: #ffffff;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .window-header .title {
+            font-weight: bold;
+        }
+        .window-header .close-btn {
+            background-color: #ff4d4d;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            text-align: center;
+            line-height: 18px;
+            font-weight: bold;
+        }
+        .window-content {
+            padding: 15px;
+        }
+        .window-content label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .window-content input[type="range"],
+        .window-content input[type="number"],
+        .window-content input[type="text"],
+        .window-content input[type="file"] {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .window-content .color-sliders {
+            display: flex;
+            justify-content: space-between;
+        }
+        .window-content .color-sliders label {
+            flex: 1;
+            margin-right: 5px;
+        }
+        .window-content .color-sliders label:last-child {
+            margin-right: 0;
+        }
+        .window-content .color-sliders input[type="range"] {
+            width: 100%;
+        }
+        .window-content button {
+            padding: 10px;
+            width: 100%;
+            background-color: #3375FF;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .window-content button:hover {
+            background-color: #2868D4;
+        }
+
+        .texture-options {
+            margin-bottom: 15px;
+        }
+        .texture-options label {
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <button id="spawnButton">Spawn Ball</button>
+
+    <div id="editWindow" class="window">
+        <div class="window-header">
+            <span class="title">Edit Ball</span>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="window-content">
+            <label for="editMass">Mass:</label>
+            <input type="number" id="editMass" min="10" max="500" step="1">
+
+            <label for="editSize">Size (Radius):</label>
+            <input type="number" id="editSize" min="10" max="100" step="1">
+
+            <label>Appearance Mode:</label>
+            <div class="texture-options">
+                <label><input type="radio" name="appearanceModeEdit" value="color" checked> Color</label>
+                <label><input type="radio" name="appearanceModeEdit" value="texture"> Texture</label>
+            </div>
+
+            <div id="colorSectionEdit">
+                <label>Color:</label>
+                <div class="color-sliders">
+                    <label>
+                        R:
+                        <input type="range" id="editColorR" min="0" max="255">
+                    </label>
+                    <label>
+                        G:
+                        <input type="range" id="editColorG" min="0" max="255">
+                    </label>
+                    <label>
+                        B:
+                        <input type="range" id="editColorB" min="0" max="255">
+                    </label>
+                </div>
+            </div>
+
+            <div id="textureSectionEdit" style="display:none;">
+                <label>Texture Source:</label>
+                <label><input type="radio" name="textureSourceEdit" value="url" checked> From URL</label>
+                <input type="text" id="textureURLEdit" placeholder="Enter image URL">
+
+                <label><input type="radio" name="textureSourceEdit" value="file"> From File</label>
+                <input type="file" id="textureFileEdit" accept="image/*">
+
+                <button id="setTextureBtnEdit">Set Texture</button>
+                <button id="clearTextureBtnEdit">Clear Texture</button>
+            </div>
+
+            <button id="deleteBall">Delete Ball</button>
+        </div>
+    </div>
+
+    <div id="spawnWindow" class="window">
+        <div class="window-header">
+            <span class="title">Spawn New Ball</span>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="window-content">
+            <label for="spawnMass">Mass:</label>
+            <input type="number" id="spawnMass" min="10" max="500" step="1" value="50">
+
+            <label for="spawnSize">Size (Radius):</label>
+            <input type="number" id="spawnSize" min="10" max="100" step="1" value="30">
+
+            <label>Appearance Mode:</label>
+            <div class="texture-options">
+                <label><input type="radio" name="appearanceModeSpawn" value="color" checked> Color</label>
+                <label><input type="radio" name="appearanceModeSpawn" value="texture"> Texture</label>
+            </div>
+
+            <div id="colorSectionSpawn">
+                <label>Color:</label>
+                <div class="color-sliders">
+                    <label>
+                        R:
+                        <input type="range" id="spawnColorR" min="0" max="255" value="255">
+                    </label>
+                    <label>
+                        G:
+                        <input type="range" id="spawnColorG" min="0" max="255" value="0">
+                    </label>
+                    <label>
+                        B:
+                        <input type="range" id="spawnColorB" min="0" max="255" value="0">
+                    </label>
+                </div>
+            </div>
+
+            <div id="textureSectionSpawn" style="display:none;">
+                <label>Texture Source:</label>
+                <label><input type="radio" name="textureSourceSpawn" value="url" checked> From URL</label>
+                <input type="text" id="textureURLSpawn" placeholder="Enter image URL">
+
+                <label><input type="radio" name="textureSourceSpawn" value="file"> From File</label>
+                <input type="file" id="textureFileSpawn" accept="image/*">
+            </div>
+
+            <button id="spawnNewBall">Spawn</button>
+        </div>
+    </div>
+
+    <script>
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          Runner = Matter.Runner,
+          Bodies = Matter.Bodies,
+          World = Matter.World,
+          Mouse = Matter.Mouse,
+          MouseConstraint = Matter.MouseConstraint,
+          Body = Matter.Body,
+          Composite = Matter.Composite,
+          Events = Matter.Events,
+          Query = Matter.Query;
+
+    const MIN_RADIUS = 10;
+    const MAX_RADIUS = 100;
+
+    const canvas = document.getElementById('gameCanvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        setBoundaries();
+    });
+
+    const engine = Engine.create();
+    const world = engine.world;
+    world.gravity.y = 1;
+
+    engine.positionIterations = 12;
+    engine.velocityIterations = 8;
+
+    const render = Render.create({
+        canvas: canvas,
+        engine: engine,
+        options: {
+            width: canvas.width,
+            height: canvas.height,
+            wireframes: false,
+            background: '#ffffff'
+        }
+    });
+    Render.run(render);
+
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+
+    const mouse = Mouse.create(canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+        mouse: mouse,
+        constraint: {
+            stiffness: 0.2,
+            render: { visible: false }
+        }
+    });
+    World.add(world, mouseConstraint);
+
+    let balls = [];
+    let selectedBallBody = null;
+
+    let heldBall = null;
+    let heldBallInitialInertia = null;
+
+    Events.on(mouseConstraint, 'startdrag', (event) => {
+        const body = event.body;
+        if (body && balls.includes(body)) {
+            heldBall = body;
+            heldBallInitialInertia = heldBall.inertia;
+            Body.setInertia(heldBall, Infinity);
+        }
+    });
+
+    Events.on(mouseConstraint, 'enddrag', (event) => {
+        const body = event.body;
+        if (body && body === heldBall) {
+            // prevent rotation permanently
+            Body.setInertia(heldBall, Infinity);
+            heldBall = null;
+            heldBallInitialInertia = null;
+        }
+    });
+
+    Events.on(engine, 'beforeUpdate', () => {
+        if (heldBall) {
+            Body.setAngularVelocity(heldBall, 0);
+            Body.setAngle(heldBall, heldBall.angle);
+        }
+    });
+
+    function rgbToHex(r, g, b) {
+        return "#" + [r, g, b].map(x => {
+            const hex = x.toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+        }).join('');
+    }
+
+    function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        const bigint = parseInt(hex, 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return { r, g, b };
+    }
+
+    function createBall(x, y, radius, color, mass) {
+        const area = Math.PI * radius * radius;
+        const density = mass / area;
+
+        const ball = Bodies.circle(x, y, radius, {
+            density: density,
+            restitution: 0.8,
+            friction: 0,
+            frictionAir: 0,
+            render: {
+                fillStyle: color
+            }
+        });
+
+        // Store the original and last color so we can revert to it after removing texture
+        ball.originalColor = color;
+        ball.lastColorBeforeTexture = color;
+        ball.originalTextureSource = null;
+
+        Body.setInertia(ball, Infinity);
+
+        World.add(world, ball);
+        balls.push(ball);
+        return ball;
+    }
+
+    // Create some initial balls for demonstration
+    createBall(200, 200, 30, '#FF5733', 1000);
+    createBall(400, 300, 30, '#3375FF', 1000);
+
+    let ground, leftWall, rightWall, topWall;
+    function setBoundaries() {
+        if (ground) Composite.remove(world, ground);
+        if (leftWall) Composite.remove(world, leftWall);
+        if (rightWall) Composite.remove(world, rightWall);
+        if (topWall) Composite.remove(world, topWall);
+
+        const w = canvas.width;
+        const h = canvas.height;
+        const offset = 500;
+        const thickness = 1000;
+
+        const wallOptions = {
+            isStatic: true,
+            restitution: 0,
+            friction: 0,
+            frictionStatic: 0,
+            render: { visible: false }
+        };
+
+        ground = Bodies.rectangle(w/2, h + offset, w + thickness, thickness, wallOptions);
+        leftWall = Bodies.rectangle(-offset, h/2, thickness, h + thickness, wallOptions);
+        rightWall = Bodies.rectangle(w + offset, h/2, thickness, h + thickness, wallOptions);
+        topWall = Bodies.rectangle(w/2, -offset, w + thickness, thickness, wallOptions);
+
+        World.add(world, [ground, leftWall, rightWall, topWall]);
+    }
+
+    setBoundaries();
+
+    const editWindow = document.getElementById('editWindow');
+    const spawnWindow = document.getElementById('spawnWindow');
+    const editCloseBtn = editWindow.querySelector('.close-btn');
+    const spawnCloseBtn = spawnWindow.querySelector('.close-btn');
+    const spawnButton = document.getElementById('spawnButton');
+
+    const editMassInput = document.getElementById('editMass');
+    const editSizeInput = document.getElementById('editSize');
+
+    const editColorR = document.getElementById('editColorR');
+    const editColorG = document.getElementById('editColorG');
+    const editColorB = document.getElementById('editColorB');
+
+    const deleteBallButton = document.getElementById('deleteBall');
+
+    const spawnMassInput = document.getElementById('spawnMass');
+    const spawnSizeInput = document.getElementById('spawnSize');
+    const spawnColorR = document.getElementById('spawnColorR');
+    const spawnColorG = document.getElementById('spawnColorG');
+    const spawnColorB = document.getElementById('spawnColorB');
+    const spawnNewBallButton = document.getElementById('spawnNewBall');
+
+    const appearanceModeEditRadios = editWindow.querySelectorAll('input[name="appearanceModeEdit"]');
+    const textureSourceEditRadios = editWindow.querySelectorAll('input[name="textureSourceEdit"]');
+    const colorSectionEdit = document.getElementById('colorSectionEdit');
+    const textureSectionEdit = document.getElementById('textureSectionEdit');
+    const textureURLEdit = document.getElementById('textureURLEdit');
+    const textureFileEdit = document.getElementById('textureFileEdit');
+    const setTextureBtnEdit = document.getElementById('setTextureBtnEdit');
+    const clearTextureBtnEdit = document.getElementById('clearTextureBtnEdit');
+
+    const appearanceModeSpawnRadios = spawnWindow.querySelectorAll('input[name="appearanceModeSpawn"]');
+    const textureSourceSpawnRadios = spawnWindow.querySelectorAll('input[name="textureSourceSpawn"]');
+    const colorSectionSpawn = document.getElementById('colorSectionSpawn');
+    const textureSectionSpawn = document.getElementById('textureSectionSpawn');
+    const textureURLSpawn = document.getElementById('textureURLSpawn');
+    const textureFileSpawn = document.getElementById('textureFileSpawn');
+
+    function positionWindow(win, posX, posY) {
+        const windowWidth = win.offsetWidth || 300;
+        const windowHeight = win.offsetHeight || 250;
+
+        let x = posX;
+        let y = posY;
+        if (x + windowWidth > window.innerWidth) {
+            x = window.innerWidth - windowWidth - 10;
+        }
+        if (y + windowHeight > window.innerHeight) {
+            y = window.innerHeight - windowHeight - 10;
+        }
+
+        win.style.left = `${x}px`;
+        win.style.top = `${y}px`;
+    }
+
+    function makeDraggable(windowElement) {
+        const header = windowElement.querySelector('.window-header');
+        let isDragging = false;
+        let offsetX, offsetY;
+
+        header.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            const rect = windowElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            windowElement.style.zIndex = parseInt(windowElement.style.zIndex, 10) + 1;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                let newX = e.clientX - offsetX;
+                let newY = e.clientY - offsetY;
+                newX = Math.max(0, Math.min(newX, window.innerWidth - windowElement.offsetWidth));
+                newY = Math.max(0, Math.min(newY, window.innerHeight - windowElement.offsetHeight));
+                windowElement.style.left = `${newX}px`;
+                windowElement.style.top = `${newY}px`;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    }
+
+    makeDraggable(editWindow);
+    makeDraggable(spawnWindow);
+
+    function openEditWindow(ball, x, y) {
+        selectedBallBody = ball;
+
+        textureURLEdit.value = "";
+        textureFileEdit.value = null;
+
+        const radius = ball.circleRadius;
+        const area = Math.PI * radius * radius;
+        const mass = ball.density * area;
+        editMassInput.value = Math.round(mass);
+        editSizeInput.value = Math.round(radius);
+
+        let usingTexture = (ball.render.sprite && ball.render.sprite.texture) ? true : false;
+
+        if (usingTexture) {
+            appearanceModeEditRadios.forEach(r => { if (r.value==="texture") r.checked = true; });
+            colorSectionEdit.style.display = "none";
+            textureSectionEdit.style.display = "block";
+        } else {
+            appearanceModeEditRadios.forEach(r => { if (r.value==="color") r.checked = true; });
+            colorSectionEdit.style.display = "block";
+            textureSectionEdit.style.display = "none";
+            const rgb = hexToRgb(ball.render.fillStyle || '#ffffff');
+            editColorR.value = rgb.r;
+            editColorG.value = rgb.g;
+            editColorB.value = rgb.b;
+        }
+
+        editWindow.style.display = 'block';
+        positionWindow(editWindow, x + 10, y + 10);
+    }
+
+    function closeEditWindow() {
+        editWindow.style.display = 'none';
+        selectedBallBody = null;
+    }
+
+    function openSpawnWindow() {
+        spawnMassInput.value = 50;
+        spawnSizeInput.value = 30;
+        spawnColorR.value = 255;
+        spawnColorG.value = 0;
+        spawnColorB.value = 0;
+
+        appearanceModeSpawnRadios.forEach(r => { if (r.value==="color") r.checked = true; });
+        colorSectionSpawn.style.display = "block";
+        textureSectionSpawn.style.display = "none";
+        textureURLSpawn.value = "";
+        textureFileSpawn.value = null;
+
+        spawnWindow.style.display = 'block';
+        positionWindow(spawnWindow, 20, 50);
+    }
+
+    function closeSpawnWindow() {
+        spawnWindow.style.display = 'none';
+    }
+
+    editCloseBtn.addEventListener('click', closeEditWindow);
+    spawnCloseBtn.addEventListener('click', closeSpawnWindow);
+    spawnButton.addEventListener('click', () => openSpawnWindow());
+
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const relativePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+        const bodiesUnderMouse = Query.point(balls, relativePos);
+        if (bodiesUnderMouse.length > 0) {
+            const body = bodiesUnderMouse[bodiesUnderMouse.length - 1];
+            openEditWindow(body, e.clientX, e.clientY);
+        }
+    });
+
+    editMassInput.addEventListener('input', () => {
+        const ball = selectedBallBody;
+        if (!ball) return;
+        const newMass = parseFloat(editMassInput.value);
+        if (!isNaN(newMass) && newMass > 0) {
+            const radius = ball.circleRadius;
+            const area = Math.PI * radius * radius;
+            const newDensity = newMass / area;
+            Body.setDensity(ball, newDensity);
+        }
+    });
+
+    editSizeInput.addEventListener('input', () => {
+        const ball = selectedBallBody;
+        if (!ball) return;
+        const newSize = parseFloat(editSizeInput.value);
+        if (!isNaN(newSize) && newSize >= MIN_RADIUS && newSize <= MAX_RADIUS) {
+            const oldPos = { x: ball.position.x, y: ball.position.y };
+            const oldColor = ball.render.fillStyle || '#ffffff';
+            const oldMass = ball.density * (Math.PI * ball.circleRadius * ball.circleRadius);
+            const oldTextureSrc = ball.originalTextureSource; 
+            const oldLastColor = ball.lastColorBeforeTexture;
+
+            Composite.remove(world, ball);
+            const newBall = createBall(oldPos.x, oldPos.y, newSize, oldColor, oldMass);
+
+            newBall.lastColorBeforeTexture = oldLastColor;
+            newBall.originalTextureSource = oldTextureSrc;
+
+            if (oldTextureSrc) {
+                applyCircularTexture(newBall, oldTextureSrc);
+            }
+
+            selectedBallBody = newBall;
+        }
+    });
+
+    function updateEditColorUI() {
+        const ball = selectedBallBody;
+        if (!ball) return;
+        const r = parseInt(editColorR.value);
+        const g = parseInt(editColorG.value);
+        const b = parseInt(editColorB.value);
+        const hexColor = rgbToHex(r, g, b);
+        ball.render.fillStyle = hexColor;
+    }
+    editColorR.addEventListener('input', updateEditColorUI);
+    editColorG.addEventListener('input', updateEditColorUI);
+    editColorB.addEventListener('input', updateEditColorUI);
+
+    deleteBallButton.addEventListener('click', () => {
+        const ball = selectedBallBody;
+        if (ball) {
+            const index = balls.indexOf(ball);
+            if (index !== -1) {
+                balls.splice(index, 1);
+            }
+            Composite.remove(world, ball);
+            closeEditWindow();
+        }
+    });
+
+    appearanceModeEditRadios.forEach(r => r.addEventListener('change', () => {
+        const ball = selectedBallBody;
+        if (!ball) return;
+
+        if (r.value === "color") {
+            colorSectionEdit.style.display = "block";
+            textureSectionEdit.style.display = "none";
+            // Revert to the last stored color before texture
+            if (ball.lastColorBeforeTexture) {
+                ball.render.fillStyle = ball.lastColorBeforeTexture;
+            }
+            if (ball.render.sprite && ball.render.sprite.texture) {
+                ball.render.sprite.texture = null;
+                ball.render.sprite.xScale = 1;
+                ball.render.sprite.yScale = 1;
+            }
+            updateEditColorUI();
+        } else {
+            // Before switching to texture mode, remember the current color
+            if (ball.render.fillStyle) {
+                ball.lastColorBeforeTexture = ball.render.fillStyle;
+            }
+            colorSectionEdit.style.display = "none";
+            textureSectionEdit.style.display = "block";
+            textureURLEdit.value = "";
+            textureFileEdit.value = null;
+        }
+    }));
+
+    function applyCircularTexture(ball, imageSrc) {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = function() {
+            const diameter = ball.circleRadius * 2;
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = diameter;
+            offCanvas.height = diameter;
+            const offCtx = offCanvas.getContext('2d');
+
+            offCtx.beginPath();
+            offCtx.arc(diameter/2, diameter/2, diameter/2, 0, Math.PI*2);
+            offCtx.clip();
+
+            const scale = Math.min(diameter/img.width, diameter/img.height);
+            const drawWidth = img.width * scale;
+            const drawHeight = img.height * scale;
+            const dx = (diameter - drawWidth) / 2;
+            const dy = (diameter - drawHeight) / 2;
+            offCtx.drawImage(img, dx, dy, drawWidth, drawHeight);
+
+            const dataURL = offCanvas.toDataURL();
+            ball.render.sprite = ball.render.sprite || {};
+            ball.render.sprite.texture = dataURL;
+            ball.render.sprite.xScale = 1;
+            ball.render.sprite.yScale = 1;
+            ball.render.fillStyle = null; 
+        };
+        img.src = imageSrc;
+    }
+
+    function setBallTextureFromDataURL(ball, dataURL) {
+        ball.originalTextureSource = dataURL;
+        applyCircularTexture(ball, dataURL);
+    }
+
+    setTextureBtnEdit.addEventListener('click', () => {
+        const ball = selectedBallBody;
+        if (!ball) return;
+
+        const sourceType = Array.from(textureSourceEditRadios).find(r=>r.checked).value;
+        if (sourceType === "url") {
+            const url = textureURLEdit.value.trim();
+            if (url) {
+                ball.originalTextureSource = url;
+                applyCircularTexture(ball, url);
+            } else {
+                alert("Please enter a valid URL.");
+            }
+        } else {
+            const file = textureFileEdit.files[0];
+            if (!file) {
+                alert("Please select a file.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataURL = e.target.result;
+                setBallTextureFromDataURL(ball, dataURL);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    clearTextureBtnEdit.addEventListener('click', () => {
+        const ball = selectedBallBody;
+        if (!ball) return;
+        if (ball.render.sprite && ball.render.sprite.texture) {
+            ball.render.sprite.texture = null;
+            ball.render.sprite.xScale = 1;
+            ball.render.sprite.yScale = 1;
+        }
+        // Restore the saved color
+        if (ball.lastColorBeforeTexture) {
+            ball.render.fillStyle = ball.lastColorBeforeTexture;
+        }
+        appearanceModeEditRadios.forEach(r => { if (r.value==="color") r.checked = true; });
+        colorSectionEdit.style.display = "block";
+        textureSectionEdit.style.display = "none";
+
+        // Update color sliders to match restored color
+        const rgb = hexToRgb(ball.render.fillStyle);
+        editColorR.value = rgb.r;
+        editColorG.value = rgb.g;
+        editColorB.value = rgb.b;
+        updateEditColorUI();
+    });
+
+    appearanceModeSpawnRadios.forEach(r => r.addEventListener('change', () => {
+        if (r.value === "color") {
+            colorSectionSpawn.style.display = "block";
+            textureSectionSpawn.style.display = "none";
+        } else {
+            colorSectionSpawn.style.display = "none";
+            textureSectionSpawn.style.display = "block";
+            textureURLSpawn.value = "";
+            textureFileSpawn.value = null;
+        }
+    }));
+
+    spawnNewBallButton.addEventListener('click', () => {
+        const mass = parseFloat(spawnMassInput.value);
+        const size = parseFloat(spawnSizeInput.value);
+        if (isNaN(mass) || mass <= 0 || isNaN(size) || size < MIN_RADIUS || size > MAX_RADIUS) {
+            alert('Please enter valid mass and size values.');
+            return;
+        }
+
+        const appearanceMode = Array.from(appearanceModeSpawnRadios).find(r=>r.checked).value;
+        const radius = size;
+        const x = radius + Math.random() * (canvas.width - 2 * radius);
+        const y = radius + Math.random() * (canvas.height - 2 * radius);
+
+        const r = parseInt(spawnColorR.value);
+        const g = parseInt(spawnColorG.value);
+        const b = parseInt(spawnColorB.value);
+        const baseColor = rgbToHex(r, g, b);
+
+        const newBall = createBall(x, y, radius, baseColor, mass);
+
+        if (appearanceMode === "texture") {
+            newBall.lastColorBeforeTexture = newBall.render.fillStyle;
+            const sourceType = Array.from(textureSourceSpawnRadios).find(r=>r.checked).value;
+            if (sourceType === "url") {
+                const url = textureURLSpawn.value.trim();
+                if (url) {
+                    newBall.originalTextureSource = url;
+                    applyCircularTexture(newBall, url);
+                } else {
+                    alert("Please enter a valid URL.");
+                }
+            } else {
+                const file = textureFileSpawn.files[0];
+                if (!file) {
+                    alert("Please select a file.");
+                    return;
+                }
+                const reader = new FileReader();
+                const thisBall = newBall;
+                reader.onload = function(e) {
+                    const dataURL = e.target.result;
+                    thisBall.originalTextureSource = dataURL;
+                    applyCircularTexture(thisBall, dataURL);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    });
+    </script>
+</body>
+</html>
