@@ -10,6 +10,11 @@
             background-color: #f0f0f0;
             position: relative;
             font-family: Arial, sans-serif;
+            /* Disable text selection globally */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
 
         canvas {
@@ -80,6 +85,11 @@
         .window-content input[type="file"] {
             width: 100%;
             margin-bottom: 15px;
+            /* Allow text selection inside inputs if desired */
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
         }
         .window-content .color-sliders {
             display: flex;
@@ -145,18 +155,9 @@
             <div id="colorSectionEdit">
                 <label>Color:</label>
                 <div class="color-sliders">
-                    <label>
-                        R:
-                        <input type="range" id="editColorR" min="0" max="255">
-                    </label>
-                    <label>
-                        G:
-                        <input type="range" id="editColorG" min="0" max="255">
-                    </label>
-                    <label>
-                        B:
-                        <input type="range" id="editColorB" min="0" max="255">
-                    </label>
+                    <label> R:<input type="range" id="editColorR" min="0" max="255"></label>
+                    <label> G:<input type="range" id="editColorG" min="0" max="255"></label>
+                    <label> B:<input type="range" id="editColorB" min="0" max="255"></label>
                 </div>
             </div>
 
@@ -164,7 +165,6 @@
                 <label>Texture Source:</label>
                 <label><input type="radio" name="textureSourceEdit" value="url" checked> From URL</label>
                 <input type="text" id="textureURLEdit" placeholder="Enter image URL">
-
                 <label><input type="radio" name="textureSourceEdit" value="file"> From File</label>
                 <input type="file" id="textureFileEdit" accept="image/*">
 
@@ -197,18 +197,9 @@
             <div id="colorSectionSpawn">
                 <label>Color:</label>
                 <div class="color-sliders">
-                    <label>
-                        R:
-                        <input type="range" id="spawnColorR" min="0" max="255" value="255">
-                    </label>
-                    <label>
-                        G:
-                        <input type="range" id="spawnColorG" min="0" max="255" value="0">
-                    </label>
-                    <label>
-                        B:
-                        <input type="range" id="spawnColorB" min="0" max="255" value="0">
-                    </label>
+                    <label> R:<input type="range" id="spawnColorR" min="0" max="255" value="255"></label>
+                    <label> G:<input type="range" id="spawnColorG" min="0" max="255" value="0"></label>
+                    <label> B:<input type="range" id="spawnColorB" min="0" max="255" value="0"></label>
                 </div>
             </div>
 
@@ -216,7 +207,6 @@
                 <label>Texture Source:</label>
                 <label><input type="radio" name="textureSourceSpawn" value="url" checked> From URL</label>
                 <input type="text" id="textureURLSpawn" placeholder="Enter image URL">
-
                 <label><input type="radio" name="textureSourceSpawn" value="file"> From File</label>
                 <input type="file" id="textureFileSpawn" accept="image/*">
             </div>
@@ -301,7 +291,6 @@
     Events.on(mouseConstraint, 'enddrag', (event) => {
         const body = event.body;
         if (body && body === heldBall) {
-            // prevent rotation permanently
             Body.setInertia(heldBall, Infinity);
             heldBall = null;
             heldBallInitialInertia = null;
@@ -345,7 +334,6 @@
             }
         });
 
-        // Store the original and last color so we can revert to it after removing or switching from texture
         ball.originalColor = color;
         ball.lastColorBeforeTexture = color;
         ball.originalTextureSource = null;
@@ -357,7 +345,7 @@
         return ball;
     }
 
-    // Create some initial balls for demonstration
+    // Initial demo balls
     createBall(200, 200, 30, '#FF5733', 1000);
     createBall(400, 300, 30, '#3375FF', 1000);
 
@@ -399,11 +387,9 @@
 
     const editMassInput = document.getElementById('editMass');
     const editSizeInput = document.getElementById('editSize');
-
     const editColorR = document.getElementById('editColorR');
     const editColorG = document.getElementById('editColorG');
     const editColorB = document.getElementById('editColorB');
-
     const deleteBallButton = document.getElementById('deleteBall');
 
     const spawnMassInput = document.getElementById('spawnMass');
@@ -614,38 +600,33 @@
         }
     });
 
-    // Updated event listener for appearance mode (the key fix requested)
     appearanceModeEditRadios.forEach(r => r.addEventListener('change', () => {
         const ball = selectedBallBody;
         if (!ball) return;
 
+        const rect = editWindow.getBoundingClientRect();
+        let currentX = rect.left;
+        let currentY = rect.top;
+
         if (r.value === "color") {
-            // Switch to color mode
             colorSectionEdit.style.display = "block";
             textureSectionEdit.style.display = "none";
 
-            // Revert to the ball's own stored last color before texture
             if (ball.lastColorBeforeTexture) {
                 ball.render.fillStyle = ball.lastColorBeforeTexture;
             }
 
-            // Remove the texture if present
             if (ball.render.sprite && ball.render.sprite.texture) {
                 ball.render.sprite.texture = null;
                 ball.render.sprite.xScale = 1;
                 ball.render.sprite.yScale = 1;
             }
 
-            // Update the sliders to match the ball's restored color
             const rgb = hexToRgb(ball.render.fillStyle || '#ffffff');
             editColorR.value = rgb.r;
             editColorG.value = rgb.g;
             editColorB.value = rgb.b;
-
-            // Do NOT call updateEditColorUI() here, since we already synchronized the sliders with the ball color.
         } else {
-            // Switch to texture mode
-            // Before switching to texture mode, remember the current color if there is one
             if (ball.render.fillStyle) {
                 ball.lastColorBeforeTexture = ball.render.fillStyle;
             }
@@ -654,6 +635,8 @@
             textureURLEdit.value = "";
             textureFileEdit.value = null;
         }
+
+        positionWindow(editWindow, currentX, currentY);
     }));
 
     function applyCircularTexture(ball, imageSrc) {
@@ -728,7 +711,7 @@
             ball.render.sprite.xScale = 1;
             ball.render.sprite.yScale = 1;
         }
-        // Restore the saved color
+
         if (ball.lastColorBeforeTexture) {
             ball.render.fillStyle = ball.lastColorBeforeTexture;
         }
@@ -736,7 +719,6 @@
         colorSectionEdit.style.display = "block";
         textureSectionEdit.style.display = "none";
 
-        // Update color sliders to match restored color
         const rgb = hexToRgb(ball.render.fillStyle);
         editColorR.value = rgb.r;
         editColorG.value = rgb.g;
@@ -768,10 +750,10 @@
         const x = radius + Math.random() * (canvas.width - 2 * radius);
         const y = radius + Math.random() * (canvas.height - 2 * radius);
 
-        const r = parseInt(spawnColorR.value);
-        const g = parseInt(spawnColorG.value);
-        const b = parseInt(spawnColorB.value);
-        const baseColor = rgbToHex(r, g, b);
+        const rVal = parseInt(spawnColorR.value);
+        const gVal = parseInt(spawnColorG.value);
+        const bVal = parseInt(spawnColorB.value);
+        const baseColor = rgbToHex(rVal, gVal, bVal);
 
         const newBall = createBall(x, y, radius, baseColor, mass);
 
